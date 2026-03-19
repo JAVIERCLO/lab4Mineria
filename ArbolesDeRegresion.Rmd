@@ -1,0 +1,82 @@
+---
+title: "Árboles"
+output: html_notebook
+---
+
+```{r paquetes}
+library(GGally)
+library(nortest)
+library(dplyr)
+library(tidyverse)
+library(rpart)
+library(caret)
+library(discretization)
+library(rpart.plot)
+```
+
+```{r carga de datos}
+load("datos/listings_modificado.RData")
+ls()
+```
+
+```{r}
+listings$log_price <- log(listings$price)
+summary(listings$log_price)
+```
+
+```{r agrupar categóricas útiles}
+categoricas <- c(
+  "room_type",
+  "property_type",
+  "neighbourhood",
+  "city",
+  "host_is_superhost",
+  "instant_bookable",
+  "bathroom_type"
+)
+
+listings[categoricas] <- lapply(listings[categoricas], as.factor)
+```
+
+
+```{r dividir conjuntos de datos}
+set.seed(123)
+
+n <- nrow(listings)
+train_data <- sample(1:n, size = 0.7*n)
+
+train <- listings[train_data, ]
+test <- listings[-train_data, ]
+```
+
+```{r arbol_exploratorio}
+
+set.seed(123)
+
+sample_index <- sample(1:nrow(listings), 5000)
+listings_sample <- listings[sample_index, ]
+
+
+arbol1 <- rpart(price ~ 
+  accommodates +
+  bathrooms_num +
+  bedrooms +
+  beds +
+  host_response_rate +
+  host_acceptance_rate +
+  calculated_host_listings_count +
+  number_of_reviews +
+  reviews_per_month +
+  review_scores_rating +
+  minimum_nights +
+  availability_365 +
+  room_type +
+  host_is_superhost +
+  instant_bookable +
+  bathroom_type,
+  data = listings_sample)
+
+rpart.plot(arbol1)
+```
+
+Fue necesario escoger las variables categóricas más importantes y trabajar con muestra porque la cantidad de datos generaba que RStudio se detuviera por un stack overflow.
