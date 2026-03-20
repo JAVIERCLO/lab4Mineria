@@ -1,5 +1,5 @@
 ---
-title: "Árboles"
+title: "Árboles de Decisión - Laboratorio 4"
 output:
   html_document:
     df_print: paged
@@ -21,28 +21,9 @@ load("datos/listings_modificado.RData")
 ls()
 ```
 
-```{r}
+```{r log_price}
 listings$log_price <- log(listings$price)
 summary(listings$log_price)
-```
-
-```{r crear_variable_clasificacion}
-# 1. Calcular los cortes (percentiles 33% y 66%) para dividir en 3 partes equitativas
-cortes <- quantile(listings$price, probs = c(0.33, 0.66), na.rm = TRUE)
-
-# 2. Crear la nueva variable categórica y convertirla a factor
-listings <- listings %>%
-  mutate(
-    categoria_precio = case_when(
-      price <= cortes[1] ~ "Económica",
-      price > cortes[1] & price <= cortes[2] ~ "Intermedia",
-      price > cortes[2] ~ "Cara"
-    ),
-    categoria_precio = as.factor(categoria_precio)
-  )
-
-# 3. Mostrar cuántas propiedades quedaron en cada categoría para el informe
-table(listings$categoria_precio)
 ```
 
 ```{r agrupar categóricas útiles}
@@ -59,6 +40,9 @@ categoricas <- c(
 listings[categoricas] <- lapply(listings[categoricas], as.factor)
 ```
 
+---
+
+## Punto 1: División de datos (mismos conjuntos que regresión lineal)
 
 ```{r dividir conjuntos de datos}
 set.seed(123)
@@ -67,16 +51,20 @@ n <- nrow(listings)
 train_data <- sample(1:n, size = 0.7*n)
 
 train <- listings[train_data, ]
-test <- listings[-train_data, ]
+test  <- listings[-train_data, ]
 ```
 
-```{r arbol_exploratorio}
+Se utiliza la misma semilla (123) y la misma proporción 70/30 que en la entrega anterior de regresión lineal, garantizando que las comparaciones entre algoritmos sean válidas sobre los mismos datos.
 
+---
+
+## Punto 2: Árbol de regresión exploratorio con muestra
+
+```{r arbol_exploratorio}
 set.seed(123)
 
-sample_index <- sample(1:nrow(listings), 5000)
+sample_index    <- sample(1:nrow(listings), 5000)
 listings_sample <- listings[sample_index, ]
-
 
 arbol1 <- rpart(price ~ 
   accommodates +
@@ -100,15 +88,13 @@ arbol1 <- rpart(price ~
 rpart.plot(arbol1)
 ```
 
-Fue necesario escoger las variables categóricas más importantes y trabajar con muestra porque la cantidad de datos generaba que RStudio se detuviera por un stack overflow.
+Fue necesario trabajar con una muestra de 5,000 observaciones porque el dataset completo generaba un stack overflow en RStudio al intentar graficar. Se seleccionaron las variables numéricas y categóricas más relevantes según el análisis exploratorio previo.
 
-Se puede observar que las variables más importantes son:
-room_type
-availability_365
-beds
-calculated_host_listings_count
+Se puede observar que las variables más importantes son: `room_type`, `availability_365`, `beds` y `calculated_host_listings_count`. Otras variables como `minimum_nights` y `host_acceptance_rate` también aparecen en el árbol, aunque con menor importancia.
 
-Otras variables como minimum_nights y host_acceptance_rate también son importantes, aunque no tanto como las anteriores.
+---
+
+## Punto 2: Árbol de regresión con datos de entrenamiento (modelo completo)
 
 ```{r primer árbol con datos de entrenamiento}
 modelo1 <- rpart(price ~ 
@@ -133,49 +119,53 @@ modelo1 <- rpart(price ~
 rpart.plot(modelo1)
 ```
 
-```{r predicciones y evaluación}
-#Predicción en test
+---
+
+## Punto 3: Predicción y análisis del modelo base
+
+```{r predicciones y evaluación modelo1}
+# Predicción en test
 predModelo1 <- predict(modelo1, newdata = test)
 
-#Métricas en test
+# Métricas en test
 rmseModelo1test <- RMSE(predModelo1, test$price)
-mseModelo1test <- mean((predModelo1 - test$price)^2)
+mseModelo1test  <- mean((predModelo1 - test$price)^2)
 
-#Predicción en train
+# Predicción en train
 predModelo1Train <- predict(modelo1, newdata = train)
 
-#Métricas en train
+# Métricas en train
 rmseModelo1train <- RMSE(predModelo1Train, train$price)
-mseModelo1train <- mean((predModelo1Train - train$price)^2)
+mseModelo1train  <- mean((predModelo1Train - train$price)^2)
 
-#Resultados
-rmseModelo1test
-mseModelo1test
-
-rmseModelo1train
-mseModelo1train
-
-#Error absoluto
-abs(rmseModelo1test - rmseModelo1train) / rmseModelo1train * 100
+# Resultados
+cat("=== Modelo 1 (profundidad default) ===\n")
+cat("RMSE Test: ",  rmseModelo1test,  "\n")
+cat("MSE  Test: ",  mseModelo1test,   "\n")
+cat("RMSE Train:", rmseModelo1train,  "\n")
+cat("MSE  Train:", mseModelo1train,   "\n")
+cat("Diferencia relativa RMSE (%):", 
+    abs(rmseModelo1test - rmseModelo1train) / rmseModelo1train * 100, "\n")
 ```
-El error nos dice que el modelo es estable la mayoría de los casos y no hay overfitting.
 
-```{r gráfica de la predicción del modelo}
-plot(test$price, col="blue", main="Predicciones vs valores originales")
-
-points(predModelo1, col="red")
-
+```{r gráfica predicción modelo1}
+plot(test$price, col = "blue", main = "Modelo 1 - Predicciones vs Valores Originales",
+     ylab = "Precio", xlab = "Observación")
+points(predModelo1, col = "red")
 legend("topright",
-       legend=c("original", "prediccion"),
-       col=c("blue", "red"),
-       pch=1,
-       cex=0.8)
+       legend = c("Original", "Predicción"),
+       col    = c("blue", "red"),
+       pch    = 1, cex = 0.8)
 ```
-En este gráfico parece pasar lo mismo que en el ejemplo de clase, al modelo le cuesta mucho predecir los valores altos, puede que sean outliers o que se arregle al probar luego con los distintos modelos adaptados.
 
-```{r validación cruzada para profundidad del árbol}
-controlcv <- trainControl(method = "cv", number = 5)
+El modelo base muestra un RMSE razonable y la diferencia porcentual entre train y test indica que no hay overfitting significativo. Sin embargo, en el gráfico se observa que el modelo tiene dificultades para predecir los valores de precio muy altos, lo cual es esperable ya que los árboles de regresión predicen promedios de nodos y tienden a subestimar los valores extremos.
 
+---
+
+## Punto 4: Modelos con diferentes profundidades + validación cruzada
+
+```{r validación cruzada para profundidad}
+controlcv    <- trainControl(method = "cv", number = 5)
 profundidades <- data.frame(maxdepth = c(2, 3, 4, 5, 6, 8, 10))
 
 modelo_depth <- train(price ~ 
@@ -195,214 +185,283 @@ modelo_depth <- train(price ~
   host_is_superhost +
   instant_bookable +
   bathroom_type,
-  data = train,
-  method = "rpart2",
-  tuneGrid = profundidades,
+  data      = train,
+  method    = "rpart2",
+  tuneGrid  = profundidades,
   trControl = controlcv,
-  metric = "RMSE"
+  metric    = "RMSE"
 )
-modelo_depth
 
-#Gráfico de RMSE vs profundidad
+modelo_depth
 plot(modelo_depth)
 ```
 
-Modelos con diferentes profundidades:
-```{r modelo 2}
+La validación cruzada con 5 folds permite identificar la profundidad óptima evaluando el RMSE en datos no vistos durante el entrenamiento. El gráfico muestra cómo varía el RMSE según la profundidad del árbol.
+
+```{r modelo 2 - profundidad 3}
 modelo2 <- rpart(price ~ 
-  accommodates +
-  bathrooms_num +
-  bedrooms +
-  beds +
-  host_response_rate +
-  host_acceptance_rate +
-  calculated_host_listings_count +
-  number_of_reviews +
-  reviews_per_month +
-  review_scores_rating +
-  minimum_nights +
-  availability_365 +
-  room_type +
-  host_is_superhost +
-  instant_bookable +
-  bathroom_type,
-  data = train,
-  method = "anova",
+  accommodates + bathrooms_num + bedrooms + beds +
+  host_response_rate + host_acceptance_rate +
+  calculated_host_listings_count + number_of_reviews +
+  reviews_per_month + review_scores_rating +
+  minimum_nights + availability_365 +
+  room_type + host_is_superhost + instant_bookable + bathroom_type,
+  data    = train,
+  method  = "anova",
   control = rpart.control(maxdepth = 3)
 )
-
-rpart.plot(modelo2)
+rpart.plot(modelo2, main = "Árbol de Regresión - Profundidad 3")
 ```
 
-```{r predicciones y evaluación modelo 2}
-#Predicción en test
-predModelo2 <- predict(modelo2, newdata = test)
+```{r evaluación modelo 2}
+predModelo2      <- predict(modelo2, newdata = test)
+rmseModelo2test  <- RMSE(predModelo2, test$price)
+mseModelo2test   <- mean((predModelo2 - test$price)^2)
 
-#Métricas en test
-rmseModelo2test <- RMSE(predModelo2, test$price)
-mseModelo2test <- mean((predModelo2 - test$price)^2)
-
-#Predicción en train
 predModelo2Train <- predict(modelo2, newdata = train)
-
-#Métricas en train
 rmseModelo2train <- RMSE(predModelo2Train, train$price)
-mseModelo2train <- mean((predModelo2Train - train$price)^2)
+mseModelo2train  <- mean((predModelo2Train - train$price)^2)
 
-#Resultados
-rmseModelo2test
-mseModelo2test
-
-rmseModelo2train
-mseModelo2train
-
-#Error absoluto
-abs(rmseModelo2test - rmseModelo2train) / rmseModelo2train * 100
+cat("=== Modelo 2 (profundidad 3) ===\n")
+cat("RMSE Test: ",  rmseModelo2test,  "\n")
+cat("MSE  Test: ",  mseModelo2test,   "\n")
+cat("RMSE Train:", rmseModelo2train,  "\n")
+cat("Diferencia relativa RMSE (%):",
+    abs(rmseModelo2test - rmseModelo2train) / rmseModelo2train * 100, "\n")
 ```
 
-
-```{r gráfica modelo 2}
-plot(test$price, col="blue", main="Predicciones vs valores originales")
-
-points(predModelo2, col="red")
-
-legend("topright",
-       legend=c("original", "prediccion"),
-       col=c("blue", "red"),
-       pch=1,
-       cex=0.8)
-```
-
-
-```{r modelo 3}
+```{r modelo 3 - profundidad 6}
 modelo3 <- rpart(price ~ 
-  accommodates +
-  bathrooms_num +
-  bedrooms +
-  beds +
-  host_response_rate +
-  host_acceptance_rate +
-  calculated_host_listings_count +
-  number_of_reviews +
-  reviews_per_month +
-  review_scores_rating +
-  minimum_nights +
-  availability_365 +
-  room_type +
-  host_is_superhost +
-  instant_bookable +
-  bathroom_type,
-  data = train,
-  method = "anova",
+  accommodates + bathrooms_num + bedrooms + beds +
+  host_response_rate + host_acceptance_rate +
+  calculated_host_listings_count + number_of_reviews +
+  reviews_per_month + review_scores_rating +
+  minimum_nights + availability_365 +
+  room_type + host_is_superhost + instant_bookable + bathroom_type,
+  data    = train,
+  method  = "anova",
   control = rpart.control(maxdepth = 6)
 )
-
-rpart.plot(modelo3)
+rpart.plot(modelo3, main = "Árbol de Regresión - Profundidad 6")
 ```
 
+```{r evaluación modelo 3}
+predModelo3      <- predict(modelo3, newdata = test)
+rmseModelo3test  <- RMSE(predModelo3, test$price)
+mseModelo3test   <- mean((predModelo3 - test$price)^2)
 
-```{r predicciones y evaluación modelo 3}
-#Predicción en test
-predModelo3 <- predict(modelo3, newdata = test)
-
-#Métricas en test
-rmseModelo3test <- RMSE(predModelo3, test$price)
-mseModelo3test <- mean((predModelo3 - test$price)^2)
-
-#Predicción en train
 predModelo3Train <- predict(modelo3, newdata = train)
-
-#Métricas en train
 rmseModelo3train <- RMSE(predModelo3Train, train$price)
-mseModelo3train <- mean((predModelo3Train - train$price)^2)
+mseModelo3train  <- mean((predModelo3Train - train$price)^2)
 
-#Resultados
-rmseModelo3test
-mseModelo3test
-
-rmseModelo3train
-mseModelo3train
-
-#Error absoluto
-abs(rmseModelo3test - rmseModelo3train) / rmseModelo3train * 100
+cat("=== Modelo 3 (profundidad 6) ===\n")
+cat("RMSE Test: ",  rmseModelo3test,  "\n")
+cat("MSE  Test: ",  mseModelo3test,   "\n")
+cat("RMSE Train:", rmseModelo3train,  "\n")
+cat("Diferencia relativa RMSE (%):",
+    abs(rmseModelo3test - rmseModelo3train) / rmseModelo3train * 100, "\n")
 ```
 
-
-```{r gráfica modelo 3}
-plot(test$price, col="blue", main="Predicciones vs valores originales")
-
-points(predModelo3, col="red")
-
-legend("topright",
-       legend=c("original", "prediccion"),
-       col=c("blue", "red"),
-       pch=1,
-       cex=0.8)
-```
-
-
-
-```{r modelo 4}
+```{r modelo 4 - profundidad 9}
 modelo4 <- rpart(price ~ 
-  accommodates +
-  bathrooms_num +
-  bedrooms +
-  beds +
-  host_response_rate +
-  host_acceptance_rate +
-  calculated_host_listings_count +
-  number_of_reviews +
-  reviews_per_month +
-  review_scores_rating +
-  minimum_nights +
-  availability_365 +
-  room_type +
-  host_is_superhost +
-  instant_bookable +
-  bathroom_type,
-  data = train,
-  method = "anova",
+  accommodates + bathrooms_num + bedrooms + beds +
+  host_response_rate + host_acceptance_rate +
+  calculated_host_listings_count + number_of_reviews +
+  reviews_per_month + review_scores_rating +
+  minimum_nights + availability_365 +
+  room_type + host_is_superhost + instant_bookable + bathroom_type,
+  data    = train,
+  method  = "anova",
   control = rpart.control(maxdepth = 9)
 )
-
-rpart.plot(modelo4)
+rpart.plot(modelo4, main = "Árbol de Regresión - Profundidad 9")
 ```
 
-```{r predicciones y evaluación modelo 4}
-#Predicción en test
-predModelo4 <- predict(modelo4, newdata = test)
+```{r evaluación modelo 4}
+predModelo4      <- predict(modelo4, newdata = test)
+rmseModelo4test  <- RMSE(predModelo4, test$price)
+mseModelo4test   <- mean((predModelo4 - test$price)^2)
 
-#Métricas en test
-rmseModelo4test <- RMSE(predModelo4, test$price)
-mseModelo4test <- mean((predModelo4 - test$price)^2)
-
-#Predicción en train
 predModelo4Train <- predict(modelo4, newdata = train)
-
-#Métricas en train
 rmseModelo4train <- RMSE(predModelo4Train, train$price)
-mseModelo4train <- mean((predModelo4Train - train$price)^2)
+mseModelo4train  <- mean((predModelo4Train - train$price)^2)
 
-#Resultados
-rmseModelo4test
-mseModelo4test
-
-rmseModelo4train
-mseModelo4train
-
-#Error absoluto
-abs(rmseModelo4test - rmseModelo4train) / rmseModelo4train * 100
+cat("=== Modelo 4 (profundidad 9) ===\n")
+cat("RMSE Test: ",  rmseModelo4test,  "\n")
+cat("MSE  Test: ",  mseModelo4test,   "\n")
+cat("RMSE Train:", rmseModelo4train,  "\n")
+cat("Diferencia relativa RMSE (%):",
+    abs(rmseModelo4test - rmseModelo4train) / rmseModelo4train * 100, "\n")
 ```
 
-```{r gráfica modelo 4}
-plot(test$price, col="blue", main="Predicciones vs valores originales")
+```{r resumen comparación árboles de regresión}
+resumen_arboles <- data.frame(
+  Modelo      = c("Modelo1 (default)", "Modelo2 (prof=3)",
+                  "Modelo3 (prof=6)",  "Modelo4 (prof=9)"),
+  RMSE_Test   = c(rmseModelo1test, rmseModelo2test,
+                  rmseModelo3test, rmseModelo4test),
+  RMSE_Train  = c(rmseModelo1train, rmseModelo2train,
+                  rmseModelo3train, rmseModelo4train),
+  MSE_Test    = c(mseModelo1test, mseModelo2test,
+                  mseModelo3test, mseModelo4test)
+)
 
-points(predModelo3, col="red")
+print(resumen_arboles)
+```
+
+De los cuatro modelos, el que presente el menor RMSE en test con menor brecha respecto al train es considerado el mejor modelo, ya que generaliza mejor a datos nuevos sin sobreajustarse.
+
+---
+
+## Punto 5: Comparación con Regresión Lineal
+
+---
+
+## Punto 6: Creación de la variable categórica de precio
+
+```{r exploración distribución de precios}
+# Estadísticos descriptivos del precio
+summary(listings$price)
+
+# Percentiles clave para definir los límites
+cuantiles <- quantile(listings$price, probs = c(0.25, 0.33, 0.50, 0.66, 0.75))
+print(cuantiles)
+
+# Histograma de la distribución del precio
+hist(listings$price,
+     breaks = 150,
+     main   = "Distribución del Precio por Noche",
+     xlab   = "Precio (USD)",
+     ylab   = "Frecuencia",
+     col    = "steelblue",
+     xlim   = c(0, 600))
+
+abline(v = quantile(listings$price, 0.33), col = "orange", lwd = 2, lty = 2)
+abline(v = quantile(listings$price, 0.66), col = "red",    lwd = 2, lty = 2)
 
 legend("topright",
-       legend=c("original", "prediccion"),
-       col=c("blue", "red"),
-       pch=1,
-       cex=0.8)
+       legend = c("Percentil 33", "Percentil 66"),
+       col    = c("orange", "red"),
+       lty    = 2, lwd = 2)
 ```
 
+```{r crear variable categórica}
+# Límites basados en los terciles (percentiles 33 y 66)
+p33 <- quantile(listings$price, 0.33)
+p66 <- quantile(listings$price, 0.66)
+
+cat("Límite inferior Económica  (< p33):", p33, "\n")
+cat("Límite superior Intermedia (p33 - p66):", p33, "-", p66, "\n")
+cat("Límite inferior Cara       (> p66):", p66, "\n")
+
+# Crear la variable en el dataset completo
+listings$price_category <- cut(
+  listings$price,
+  breaks = c(-Inf, p33, p66, Inf),
+  labels = c("Economica", "Intermedia", "Cara"),
+  right  = TRUE
+)
+
+# Verificar distribución de clases
+cat("\nDistribución absoluta:\n")
+print(table(listings$price_category))
+
+cat("\nDistribución porcentual:\n")
+print(round(prop.table(table(listings$price_category)) * 100, 1))
+
+# Gráfico de barras de la distribución de categorías
+barplot(table(listings$price_category),
+        col  = c("seagreen", "steelblue", "coral"),
+        main = "Distribución de Categorías de Precio",
+        ylab = "Cantidad de propiedades",
+        xlab = "Categoría")
+```
+
+La variable `price_category` se definió usando los **terciles** de la distribución de precios (percentiles 33 y 66). Este criterio se justifica porque:
+
+- Divide los datos en tres grupos con proporciones aproximadamente iguales (~33% cada uno), evitando clases desbalanceadas que perjudican el entrenamiento de los modelos de clasificación.
+- Los límites reflejan la distribución real de los datos y no valores arbitrarios.
+- Las propiedades por debajo del percentil 33 se clasifican como **Económicas**, entre el percentil 33 y 66 como **Intermedias**, y por encima del percentil 66 como **Caras**.
+
+```{r propagar variable a train y test}
+# Propagar price_category a train y test usando los índices originales
+train$price_category <- listings$price_category[as.numeric(rownames(train))]
+test$price_category  <- listings$price_category[as.numeric(rownames(test))]
+
+# Verificar ausencia de NAs
+cat("NAs en train:", sum(is.na(train$price_category)), "\n")
+cat("NAs en test: ", sum(is.na(test$price_category)),  "\n")
+
+# Verificar distribución en cada conjunto
+cat("\nDistribución en Train:\n")
+print(round(prop.table(table(train$price_category)) * 100, 1))
+
+cat("\nDistribución en Test:\n")
+print(round(prop.table(table(test$price_category)) * 100, 1))
+```
+
+---
+
+## Punto 7: Árbol de Clasificación
+
+```{r árbol de clasificación}
+# Se excluyen price y log_price para evitar fuga de información (data leakage)
+set.seed(123)
+
+arbol_clasificacion <- rpart(
+  price_category ~ 
+    accommodates +
+    bathrooms_num +
+    bedrooms +
+    beds +
+    host_response_rate +
+    host_acceptance_rate +
+    calculated_host_listings_count +
+    number_of_reviews +
+    reviews_per_month +
+    review_scores_rating +
+    minimum_nights +
+    availability_365 +
+    room_type +
+    host_is_superhost +
+    instant_bookable +
+    bathroom_type,
+  data   = train,
+  method = "class"
+)
+
+# Representación gráfica del árbol
+rpart.plot(
+  arbol_clasificacion,
+  type  = 4,
+  extra = 104,
+  main  = "Árbol de Clasificación - Categoría de Precio"
+)
+```
+
+```{r importancia de variables clasificación}
+# Importancia de variables según el árbol de clasificación
+importancia <- arbol_clasificacion$variable.importance
+
+barplot(
+  sort(importancia, decreasing = TRUE),
+  las   = 2,
+  col   = "steelblue",
+  main  = "Importancia de Variables - Árbol de Clasificación",
+  ylab  = "Importancia",
+  cex.names = 0.8
+)
+```
+
+```{r predicción y evaluación árbol de clasificación}
+# Predicción sobre el conjunto de prueba
+pred_clasificacion <- predict(arbol_clasificacion, newdata = test, type = "class")
+
+# Matriz de confusión
+conf_matrix <- confusionMatrix(pred_clasificacion, test$price_category)
+print(conf_matrix)
+```
+
+El árbol de clasificación utiliza únicamente variables relacionadas con las características de la propiedad y el anfitrión, **sin incluir el precio ni el log_price**, para evitar fuga de información (*data leakage*). Las variables más importantes para clasificar una propiedad como Económica, Intermedia o Cara son aquellas que el árbol selecciona en los primeros nodos de la división, que típicamente coinciden con `accommodates`, `bedrooms`, `beds` y `room_type`, variables directamente relacionadas con el tamaño y tipo de la propiedad.
+
+La representación gráfica del árbol muestra en cada nodo la clase predicha, la distribución de probabilidades entre las tres categorías y el porcentaje de observaciones que llega a ese nodo, lo que facilita la interpretación del modelo.
