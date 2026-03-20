@@ -151,3 +151,237 @@ legend("topright",
        cex=0.8)
 ```
 En este gráfico parece pasar lo mismo que en el ejemplo de clase, al modelo le cuesta mucho predecir los valores altos, puede que sean outliers o que se arregle al probar luego con los distintos modelos adaptados.
+
+```{r validación cruzada para profundidad del árbol}
+controlcv <- trainControl(method = "cv", number = 5)
+
+profundidades <- data.frame(maxdepth = c(2, 3, 4, 5, 6, 8, 10))
+
+modelo_depth <- train(price ~ 
+  accommodates +
+  bathrooms_num +
+  bedrooms +
+  beds +
+  host_response_rate +
+  host_acceptance_rate +
+  calculated_host_listings_count +
+  number_of_reviews +
+  reviews_per_month +
+  review_scores_rating +
+  minimum_nights +
+  availability_365 +
+  room_type +
+  host_is_superhost +
+  instant_bookable +
+  bathroom_type,
+  data = train,
+  method = "rpart2",
+  tuneGrid = profundidades,
+  trControl = controlcv,
+  metric = "RMSE"
+)
+modelo_depth
+
+#Gráfico de RMSE vs profundidad
+plot(modelo_depth)
+```
+
+Modelos con diferentes profundidades:
+```{r modelo 2}
+modelo2 <- rpart(price ~ 
+  accommodates +
+  bathrooms_num +
+  bedrooms +
+  beds +
+  host_response_rate +
+  host_acceptance_rate +
+  calculated_host_listings_count +
+  number_of_reviews +
+  reviews_per_month +
+  review_scores_rating +
+  minimum_nights +
+  availability_365 +
+  room_type +
+  host_is_superhost +
+  instant_bookable +
+  bathroom_type,
+  data = train,
+  method = "anova",
+  control = rpart.control(maxdepth = 3)
+)
+
+rpart.plot(modelo2)
+```
+
+```{r predicciones y evaluación modelo 2}
+#Predicción en test
+predModelo2 <- predict(modelo2, newdata = test)
+
+#Métricas en test
+rmseModelo2test <- RMSE(predModelo2, test$price)
+mseModelo2test <- mean((predModelo2 - test$price)^2)
+
+#Predicción en train
+predModelo2Train <- predict(modelo2, newdata = train)
+
+#Métricas en train
+rmseModelo2train <- RMSE(predModelo2Train, train$price)
+mseModelo2train <- mean((predModelo2Train - train$price)^2)
+
+#Resultados
+rmseModelo2test
+mseModelo2test
+
+rmseModelo2train
+mseModelo2train
+
+#Error absoluto
+abs(rmseModelo2test - rmseModelo2train) / rmseModelo2train * 100
+```
+
+
+```{r gráfica modelo 2}
+plot(test$price, col="blue", main="Predicciones vs valores originales")
+
+points(predModelo2, col="red")
+
+legend("topright",
+       legend=c("original", "prediccion"),
+       col=c("blue", "red"),
+       pch=1,
+       cex=0.8)
+```
+
+
+```{r modelo 3}
+modelo3 <- rpart(price ~ 
+  accommodates +
+  bathrooms_num +
+  bedrooms +
+  beds +
+  host_response_rate +
+  host_acceptance_rate +
+  calculated_host_listings_count +
+  number_of_reviews +
+  reviews_per_month +
+  review_scores_rating +
+  minimum_nights +
+  availability_365 +
+  room_type +
+  host_is_superhost +
+  instant_bookable +
+  bathroom_type,
+  data = train,
+  method = "anova",
+  control = rpart.control(maxdepth = 6)
+)
+
+rpart.plot(modelo3)
+```
+
+
+```{r predicciones y evaluación modelo 3}
+#Predicción en test
+predModelo3 <- predict(modelo3, newdata = test)
+
+#Métricas en test
+rmseModelo3test <- RMSE(predModelo3, test$price)
+mseModelo3test <- mean((predModelo3 - test$price)^2)
+
+#Predicción en train
+predModelo3Train <- predict(modelo3, newdata = train)
+
+#Métricas en train
+rmseModelo3train <- RMSE(predModelo3Train, train$price)
+mseModelo3train <- mean((predModelo3Train - train$price)^2)
+
+#Resultados
+rmseModelo3test
+mseModelo3test
+
+rmseModelo3train
+mseModelo3train
+
+#Error absoluto
+abs(rmseModelo3test - rmseModelo3train) / rmseModelo3train * 100
+```
+
+
+```{r gráfica modelo 3}
+plot(test$price, col="blue", main="Predicciones vs valores originales")
+
+points(predModelo3, col="red")
+
+legend("topright",
+       legend=c("original", "prediccion"),
+       col=c("blue", "red"),
+       pch=1,
+       cex=0.8)
+```
+
+
+
+```{r modelo 4}
+modelo4 <- rpart(price ~ 
+  accommodates +
+  bathrooms_num +
+  bedrooms +
+  beds +
+  host_response_rate +
+  host_acceptance_rate +
+  calculated_host_listings_count +
+  number_of_reviews +
+  reviews_per_month +
+  review_scores_rating +
+  minimum_nights +
+  availability_365 +
+  room_type +
+  host_is_superhost +
+  instant_bookable +
+  bathroom_type,
+  data = train,
+  method = "anova",
+  control = rpart.control(maxdepth = 9)
+)
+
+rpart.plot(modelo4)
+```
+
+```{r predicciones y evaluación modelo 4}
+#Predicción en test
+predModelo4 <- predict(modelo4, newdata = test)
+
+#Métricas en test
+rmseModelo4test <- RMSE(predModelo4, test$price)
+mseModelo4test <- mean((predModelo4 - test$price)^2)
+
+#Predicción en train
+predModelo4Train <- predict(modelo4, newdata = train)
+
+#Métricas en train
+rmseModelo4train <- RMSE(predModelo4Train, train$price)
+mseModelo4train <- mean((predModelo4Train - train$price)^2)
+
+#Resultados
+rmseModelo4test
+mseModelo4test
+
+rmseModelo4train
+mseModelo4train
+
+#Error absoluto
+abs(rmseModelo4test - rmseModelo4train) / rmseModelo4train * 100
+```
+
+```{r gráfica modelo 4}
+plot(test$price, col="blue", main="Predicciones vs valores originales")
+
+points(predModelo3, col="red")
+
+legend("topright",
+       legend=c("original", "prediccion"),
+       col=c("blue", "red"),
+       pch=1,
+       cex=0.8)
+```
+
