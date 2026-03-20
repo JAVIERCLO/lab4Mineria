@@ -80,3 +80,74 @@ rpart.plot(arbol1)
 ```
 
 Fue necesario escoger las variables categóricas más importantes y trabajar con muestra porque la cantidad de datos generaba que RStudio se detuviera por un stack overflow.
+
+Se puede observar que las variables más importantes son:
+room_type
+availability_365
+beds
+calculated_host_listings_count
+
+Otras variables como minimum_nights y host_acceptance_rate también son importantes, aunque no tanto como las anteriores.
+
+```{r primer árbol con datos de entrenamiento}
+modelo1 <- rpart(price ~ 
+  accommodates +
+  bathrooms_num +
+  bedrooms +
+  beds +
+  host_response_rate +
+  host_acceptance_rate +
+  calculated_host_listings_count +
+  number_of_reviews +
+  reviews_per_month +
+  review_scores_rating +
+  minimum_nights +
+  availability_365 +
+  room_type +
+  host_is_superhost +
+  instant_bookable +
+  bathroom_type,
+  data = train)
+
+rpart.plot(modelo1)
+```
+
+```{r predicciones y evaluación}
+#Predicción en test
+predModelo1 <- predict(modelo1, newdata = test)
+
+#Métricas en test
+rmseModelo1test <- RMSE(predModelo1, test$price)
+mseModelo1test <- mean((predModelo1 - test$price)^2)
+
+#Predicción en train
+predModelo1Train <- predict(modelo1, newdata = train)
+
+#Métricas en train
+rmseModelo1train <- RMSE(predModelo1Train, train$price)
+mseModelo1train <- mean((predModelo1Train - train$price)^2)
+
+#Resultados
+rmseModelo1test
+mseModelo1test
+
+rmseModelo1train
+mseModelo1train
+
+#Error absoluto
+abs(rmseModelo1test - rmseModelo1train) / rmseModelo1train * 100
+```
+El error nos dice que el modelo es estable la mayoría de los casos y no hay overfitting.
+
+```{r gráfica de la predicción del modelo}
+plot(test$price, col="blue", main="Predicciones vs valores originales")
+
+points(predModelo1, col="red")
+
+legend("topright",
+       legend=c("original", "prediccion"),
+       col=c("blue", "red"),
+       pch=1,
+       cex=0.8)
+```
+En este gráfico parece pasar lo mismo que en el ejemplo de clase, al modelo le cuesta mucho predecir los valores altos, puede que sean outliers o que se arregle al probar luego con los distintos modelos adaptados.
