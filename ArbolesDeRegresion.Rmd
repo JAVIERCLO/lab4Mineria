@@ -1,6 +1,8 @@
 ---
 title: "Árboles"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r paquetes}
@@ -22,6 +24,25 @@ ls()
 ```{r}
 listings$log_price <- log(listings$price)
 summary(listings$log_price)
+```
+
+```{r crear_variable_clasificacion}
+# 1. Calcular los cortes (percentiles 33% y 66%) para dividir en 3 partes equitativas
+cortes <- quantile(listings$price, probs = c(0.33, 0.66), na.rm = TRUE)
+
+# 2. Crear la nueva variable categórica y convertirla a factor
+listings <- listings %>%
+  mutate(
+    categoria_precio = case_when(
+      price <= cortes[1] ~ "Económica",
+      price > cortes[1] & price <= cortes[2] ~ "Intermedia",
+      price > cortes[2] ~ "Cara"
+    ),
+    categoria_precio = as.factor(categoria_precio)
+  )
+
+# 3. Mostrar cuántas propiedades quedaron en cada categoría para el informe
+table(listings$categoria_precio)
 ```
 
 ```{r agrupar categóricas útiles}
