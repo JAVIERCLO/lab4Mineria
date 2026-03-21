@@ -462,6 +462,38 @@ conf_matrix <- confusionMatrix(pred_clasificacion, test$price_category)
 print(conf_matrix)
 ```
 
+```{r punto_10_validacion_cruzada}
+# 1. Configurar la validación cruzada (10-fold CV)
+train_control <- trainControl(method = "cv", number = 10)
+
+# 2. Entrenar el modelo de clasificación con Validación Cruzada
+# Usamos 'rpart' como método y la variable categórica que creaste
+set.seed(123)
+modelo_cv <- train(
+  price_category ~ 
+    accommodates + bathrooms_num + bedrooms + beds + 
+    host_response_rate + host_acceptance_rate + 
+    calculated_host_listings_count + number_of_reviews + 
+    reviews_per_month + review_scores_rating + 
+    minimum_nights + availability_365 + 
+    room_type + host_is_superhost + 
+    instant_bookable + bathroom_type,
+  data = train,
+  method = "rpart",
+  trControl = train_control,
+  tuneLength = 10  # Prueba 10 valores diferentes de complejidad (cp)
+)
+
+# 3. Ver el mejor modelo encontrado
+print(modelo_cv)
+
+# 4. Predecir con el nuevo modelo en el conjunto de prueba
+pred_cv <- predict(modelo_cv, newdata = test)
+
+# 5. Generar la matriz de confusión para comparar
+conf_matrix_cv <- confusionMatrix(pred_cv, test$price_category)
+print(conf_matrix_cv)
+```
 El árbol de clasificación utiliza únicamente variables relacionadas con las características de la propiedad y el anfitrión, **sin incluir el precio ni el log_price**, para evitar fuga de información (*data leakage*). Las variables más importantes para clasificar una propiedad como Económica, Intermedia o Cara son aquellas que el árbol selecciona en los primeros nodos de la división, que típicamente coinciden con `accommodates`, `bedrooms`, `beds` y `room_type`, variables directamente relacionadas con el tamaño y tipo de la propiedad.
 
 La representación gráfica del árbol muestra en cada nodo la clase predicha, la distribución de probabilidades entre las tres categorías y el porcentaje de observaciones que llega a ese nodo, lo que facilita la interpretación del modelo.
