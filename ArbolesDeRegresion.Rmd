@@ -467,7 +467,6 @@ print(conf_matrix)
 train_control <- trainControl(method = "cv", number = 10)
 
 # 2. Entrenar el modelo de clasificación con Validación Cruzada
-# Usamos 'rpart' como método y la variable categórica que creaste
 set.seed(123)
 modelo_cv <- train(
   price_category ~ 
@@ -493,6 +492,34 @@ pred_cv <- predict(modelo_cv, newdata = test)
 # 5. Generar la matriz de confusión para comparar
 conf_matrix_cv <- confusionMatrix(pred_cv, test$price_category)
 print(conf_matrix_cv)
+```
+
+```{r clasificacion_profundidad_5}
+# Entrenar modelo de clasificación con profundidad máxima de 5
+set.seed(123)
+modelo_clas_prof5 <- rpart(
+  price_category ~ 
+    accommodates + bathrooms_num + bedrooms + beds + 
+    host_response_rate + host_acceptance_rate + 
+    calculated_host_listings_count + number_of_reviews + 
+    reviews_per_month + review_scores_rating + 
+    minimum_nights + availability_365 + 
+    room_type + host_is_superhost + 
+    instant_bookable + bathroom_type,
+  data = train,
+  method = "class",
+  control = rpart.control(maxdepth = 5) 
+)
+
+# Graficar para ver cómo quedó limitándolo a 5 niveles
+rpart.plot(modelo_clas_prof5, main = "Clasificación - Profundidad 5")
+
+# Predecir y sacar la matriz para ver si el Accuracy sube o baja
+pred_prof5 <- predict(modelo_clas_prof5, newdata = test, type = "class")
+conf_matrix_prof5 <- confusionMatrix(pred_prof5, test$price_category)
+
+# Imprimir solo el Accuracy y el Kappa para comparar rápido
+print(conf_matrix_prof5$overall[c("Accuracy", "Kappa")])
 ```
 El árbol de clasificación utiliza únicamente variables relacionadas con las características de la propiedad y el anfitrión, **sin incluir el precio ni el log_price**, para evitar fuga de información (*data leakage*). Las variables más importantes para clasificar una propiedad como Económica, Intermedia o Cara son aquellas que el árbol selecciona en los primeros nodos de la división, que típicamente coinciden con `accommodates`, `bedrooms`, `beds` y `room_type`, variables directamente relacionadas con el tamaño y tipo de la propiedad.
 
